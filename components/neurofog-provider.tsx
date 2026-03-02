@@ -244,13 +244,13 @@ export function NeuroFogProvider({ children }: { children: ReactNode }) {
     }
 
     // Track sustained CFI levels - aligned with intervention thresholds
-    if (smoothedCfi >= 60) {  // High threshold for NeuroPatch - requires 35 seconds
+    if (smoothedCfi >= 45) {  // High threshold for NeuroPatch - activates at 45+
       sustainedCfiRef.current.high++
     } else {
       sustainedCfiRef.current.high = 0
     }
     
-    if (smoothedCfi >= 75) {  // Medium-high threshold for NeuroGarden - increased to 75
+    if (smoothedCfi >= 35) {  // Medium threshold for NeuroGarden
       sustainedCfiRef.current.medium++
     } else {
       sustainedCfiRef.current.medium = 0
@@ -385,34 +385,34 @@ export function NeuroFogProvider({ children }: { children: ReactNode }) {
       })
     }
     
-    // Improved intervention logic - prevents premature activation
+    // Improved intervention logic - auto-activates at thresholds
     if (!isPatchActive && !isGardenActive && timeSinceLastIntervention >= minInterventionInterval) {
-      // NeuroPatch activation - requires 35 seconds of sustained high stress (CFI 60+) 
-      if (smoothedCfi >= 60 && sustainedCfiRef.current.high >= 35) { // 35 seconds of sustained stress
+      // NeuroPatch activation - CFI 45+ for 5 seconds sustained
+      if (smoothedCfi >= 45 && sustainedCfiRef.current.high >= 5) {
         console.log(`🩹 NeuroPatch ACTIVATING! CFI: ${smoothedCfi}, Sustained: ${sustainedCfiRef.current.high} seconds`)
         setIsPatchActive(true)
         patchStartCfiRef.current = smoothedCfi
         lastInterventionTimeRef.current = now
         sustainedCfiRef.current.medium = 0
         sustainedCfiRef.current.high = 0
-        console.log('🩹 NeuroPatch activated - 35 seconds of sustained high stress')
+        console.log('🩹 NeuroPatch activated - CFI 45+ sustained for 5 seconds')
       }
-      // NeuroGarden activation - CFI 75 threshold (increased from 35)
-      else if (smoothedCfi >= 75 && sustainedCfiRef.current.medium >= 3) { // 3 seconds at CFI 75+
+      // NeuroGarden activation - CFI 35+ for 3 seconds sustained
+      else if (smoothedCfi >= 35 && sustainedCfiRef.current.medium >= 3) {
         console.log(`🌱 NeuroGarden ACTIVATING! CFI: ${smoothedCfi}, Sustained: ${sustainedCfiRef.current.medium}`)
         setIsGardenActive(true)
         lastInterventionTimeRef.current = now
         sustainedCfiRef.current.medium = 0
         sustainedCfiRef.current.high = 0
-        console.log('🌱 NeuroGarden activated - Stress detected at CFI 75+')
+        console.log('🌱 NeuroGarden activated - CFI 35+ for 3 seconds')
       }
       // Debug why activation didn't happen
-      else if (smoothedCfi >= 50) {
-        console.log(`🙅 No activation: CFI ${smoothedCfi} (need 75+ for Garden, 60+ for Patch) | Garden sustained: ${sustainedCfiRef.current.medium}/3 | Patch sustained: ${sustainedCfiRef.current.high}/35`)
+      else if (smoothedCfi >= 30) {
+        console.log(`🙅 No activation: CFI ${smoothedCfi} (need 35+ for Garden, 45+ for Patch) | Garden sustained: ${sustainedCfiRef.current.medium}/3 | Patch sustained: ${sustainedCfiRef.current.high}/5`)
       }
     }
     // Log why interventions are blocked
-    else if (smoothedCfi >= 60 && !isPatchActive && !isGardenActive) {
+    else if (smoothedCfi >= 35 && !isPatchActive && !isGardenActive) {
       const remainingCooldown = Math.max(0, (minInterventionInterval - timeSinceLastIntervention) / 1000 / 60)
       if (remainingCooldown > 0) {
         console.log(`⏰ Interventions blocked - ${Math.ceil(remainingCooldown)} seconds cooldown remaining`)
