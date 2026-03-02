@@ -79,7 +79,7 @@ export function NeuroFogProvider({ children }: { children: ReactNode }) {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const cfiHistoryRef = useRef<number[]>([])
   const patchStartCfiRef = useRef<number | null>(null)
-  const lastInterventionTimeRef = useRef<number>(0)
+  const lastInterventionTimeRef = useRef<number>(Date.now() - 10 * 60 * 1000) // Start 10 mins ago for immediate demo availability
   const sustainedCfiRef = useRef<{ high: number; medium: number }>({ high: 0, medium: 0 })
 
   const [isTracking, setIsTracking] = useState(false)
@@ -113,11 +113,19 @@ export function NeuroFogProvider({ children }: { children: ReactNode }) {
   })
   const [timeline, setTimeline] = useState<TimelineEntry[]>([])
 
-  // Initialize tracker
+  // Initialize tracker and auto-start tracking for demo
   useEffect(() => {
     trackerRef.current = new CognitiveTracker()
+    
+    // Auto-start tracking for demo purposes after 1 second
+    const autoStartTimer = setTimeout(() => {
+      setIsTracking(true)
+      console.log('🎆 Demo: Auto-starting tracking for seamless experience')
+    }, 1000)
+    
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
+      clearTimeout(autoStartTimer)
     }
   }, [])
 
@@ -154,26 +162,32 @@ export function NeuroFogProvider({ children }: { children: ReactNode }) {
     const baseline = trackerRef.current.getBaseline()
     const { cfi: rawCfi, normalizedLoad, attentionStability, isExcessiveAgitation } = computeCFI(signals, baseline, sentimentScore)
 
-    // Apply very conservative smoothing to prevent rapid CFI changes
+    // Demo-optimized smoothing - allow faster changes for demo visibility
     let smoothedCfi = rawCfi
     if (cfiHistoryRef.current.length > 0) {
       const lastCfi = cfiHistoryRef.current[cfiHistoryRef.current.length - 1]
-      // Extremely limited change - max 2 points per update
-      const maxChange = 2
+      // Allow faster changes for demo - max 15 points per update (or immediate for agitation)
+      const maxChange = isExcessiveAgitation ? 50 : 15  // Increased for demo visibility
       const cfiDelta = rawCfi - lastCfi
       if (Math.abs(cfiDelta) > maxChange) {
         smoothedCfi = lastCfi + Math.sign(cfiDelta) * maxChange
       }
     }
+    
+    // DEMO BOOST: If any stress signals are detected, give extra CFI boost
+    if (signals.mouseSpeed > 200 || signals.scrollSpeed > 100 || signals.typingVariability > 0.5) {
+      smoothedCfi = Math.min(100, smoothedCfi + 10) // Extra boost for demo
+      console.log(`🚀 Demo boost applied! CFI boosted to ${smoothedCfi}`)
+    }
 
-    // Track sustained CFI levels - demo optimized for faster response
-    if (smoothedCfi >= 50) {  // Reduced from 60
+    // Track sustained CFI levels - aligned with intervention thresholds
+    if (smoothedCfi >= 60) {  // High threshold for NeuroPatch
       sustainedCfiRef.current.high++
     } else {
       sustainedCfiRef.current.high = 0
     }
     
-    if (smoothedCfi >= 35) {  // Reduced from 45
+    if (smoothedCfi >= 35) {  // Medium threshold for NeuroGarden - reduced to 35
       sustainedCfiRef.current.medium++
     } else {
       sustainedCfiRef.current.medium = 0
@@ -197,6 +211,79 @@ export function NeuroFogProvider({ children }: { children: ReactNode }) {
 
     setState(newState)
 
+    // Debug logging for demo with calm state detection
+    if (smoothedCfi > 10 || isExcessiveAgitation) {
+      console.log(`CFI: ${smoothedCfi}, Mouse: ${Math.round(signals.mouseSpeed)}px/s, Scroll: ${Math.round(signals.scrollSpeed)}px/s, Agitation: ${isExcessiveAgitation}, Sustained Medium: ${sustainedCfiRef.current.medium}, Sustained High: ${sustainedCfiRef.current.high}`)
+    } else if (smoothedCfi < 10 && cfiHistoryRef.current.length > 5) {
+      console.log(`😌 User in calm state - CFI: ${smoothedCfi} (interventions on cooldown)`)
+    }
+
+    // Manual activation for demo purposes (console commands)
+    if (typeof window !== 'undefined') {
+      (window as any).demoActivateGarden = () => {
+        if (!isGardenActive && !isPatchActive) {
+          setIsGardenActive(true)
+          lastInterventionTimeRef.current = Date.now()
+          console.log('🌱 Demo: NeuroGarden manually activated')
+        } else {
+          console.log('⚠️ Demo: Cannot activate Garden - Patch active:', isPatchActive, 'Garden active:', isGardenActive)
+        }
+      }
+      (window as any).demoActivatePatch = () => {
+        if (!isPatchActive && !isGardenActive) {
+          setIsPatchActive(true)
+          lastInterventionTimeRef.current = Date.now()
+          console.log('🩹 Demo: NeuroPatch manually activated')
+        } else {
+          console.log('⚠️ Demo: Cannot activate Patch - Patch active:', isPatchActive, 'Garden active:', isGardenActive)
+        }
+      }
+      (window as any).demoResetCFI = () => {
+        cfiHistoryRef.current = []
+        sustainedCfiRef.current = { high: 0, medium: 0 }
+        lastInterventionTimeRef.current = Date.now() - 10 * 60 * 1000 // Reset cooldown
+        setIsPatchActive(false)
+        setIsGardenActive(false)
+        console.log('🔄 Demo: CFI system reset - interventions now available')
+      }
+      (window as any).demoStartTracking = () => {
+        setIsTracking(true)
+        console.log('🏁 Demo: Tracking started')
+      }
+      (window as any).demoForceCFI = (targetCfi: number) => {
+        const newState = {
+          ...state,
+          cfi: targetCfi,
+          status: getStatusFromCFI(targetCfi)
+        }
+        setState(newState)
+        cfiHistoryRef.current.push(targetCfi)
+        
+        // Trigger sustained reading counts
+        if (targetCfi >= 35) sustainedCfiRef.current.medium = 2
+        if (targetCfi >= 60) sustainedCfiRef.current.high = 2
+        
+        console.log(`📊 Demo: CFI forced to ${targetCfi} with sustained readings`)
+      }
+      (window as any).demoCheckState = () => {
+        console.log('📊 Demo State Check:', {
+          tracking: isTracking,
+          cfi: state.cfi,
+          gardenActive: isGardenActive,
+          patchActive: isPatchActive,
+          sustainedMedium: sustainedCfiRef.current.medium,
+          sustainedHigh: sustainedCfiRef.current.high,
+          cooldownRemaining: Math.max(0, (minInterventionInterval - (Date.now() - lastInterventionTimeRef.current)) / 60000).toFixed(1) + ' minutes'
+        })
+      }
+      
+      // Show available commands once
+      if (!(window as any).demoCmdShown) {
+        console.log('🛠️ Demo commands: demoActivateGarden(), demoForceCFI(40), demoCheckState(), demoResetCFI()')
+        ;(window as any).demoCmdShown = true
+      }
+    }
+
     // Add to timeline every update
     setTimeline(prev => {
       const entry: TimelineEntry = {
@@ -211,36 +298,68 @@ export function NeuroFogProvider({ children }: { children: ReactNode }) {
       return updated
     })
 
-    // Very conservative intervention logic with sustained high CFI requirement
+    // Intervention logic - optimized for demo responsiveness
     const now = Date.now()
     const timeSinceLastIntervention = now - lastInterventionTimeRef.current
-    const minInterventionInterval = 5 * 60 * 1000 // 5 minutes for demo (reduced from 20)
+    const minInterventionInterval = 30 * 1000 // 30 SECONDS for demo (was 3 minutes)
+    
+    // Debug intervention state - comprehensive logging
+    if (smoothedCfi >= 20) { // Lower threshold for more visibility
+      console.log(`🔍 Intervention Debug:`, {
+        cfi: smoothedCfi,
+        mediumSustained: `${sustainedCfiRef.current.medium}/2`,
+        highSustained: `${sustainedCfiRef.current.high}/2`, 
+        cooldownMins: Math.max(0, (minInterventionInterval - timeSinceLastIntervention)/1000/60).toFixed(1),
+        canActivateGarden: !isPatchActive && !isGardenActive && timeSinceLastIntervention >= minInterventionInterval && smoothedCfi >= 35,
+        gardenActive: isGardenActive,
+        patchActive: isPatchActive,
+        tracking: isTracking
+      })
+    }
     
     // IMMEDIATE NeuroPatch activation for excessive agitation (mouse + scroll)
     if (isExcessiveAgitation && !isPatchActive && !isGardenActive) {
+      setIsGardenActive(false) // Ensure garden is off
       setIsPatchActive(true)
       patchStartCfiRef.current = smoothedCfi
       lastInterventionTimeRef.current = now
       sustainedCfiRef.current.medium = 0
       sustainedCfiRef.current.high = 0
-      console.log('🚨 Emergency NeuroPatch activated due to excessive agitation')
+      console.log('🚨 Emergency NeuroPatch activated - Excessive agitation detected!')
     }
-    // Normal intervention logic for sustained CFI - demo optimized
-    else if (!isPatchActive && !isGardenActive && timeSinceLastIntervention > minInterventionInterval) {
-      // NeuroGarden activation - faster for demo visibility
-      if (smoothedCfi >= 40 && sustainedCfiRef.current.medium >= 3) { // Reduced thresholds for demo
+    // Normal intervention logic - demo optimized for FASTER activation
+    else if (!isPatchActive && !isGardenActive && timeSinceLastIntervention >= minInterventionInterval) {
+      // NeuroGarden activation - CFI 35 threshold (REDUCED requirements for demo)
+      if (smoothedCfi >= 35 && sustainedCfiRef.current.medium >= 1) { // REDUCED to just 1 sustained reading!
+        console.log(`🌱 NeuroGarden ACTIVATING! CFI: ${smoothedCfi}, Sustained: ${sustainedCfiRef.current.medium}`)
         setIsGardenActive(true)
         lastInterventionTimeRef.current = now
         sustainedCfiRef.current.medium = 0
         sustainedCfiRef.current.high = 0
+        console.log('🌱 NeuroGarden activated - Stress detected at CFI 35+')
       }
-      // NeuroPatch activation - faster for demo visibility  
-      else if (smoothedCfi >= 60 && sustainedCfiRef.current.high >= 3) { // Reduced thresholds for demo
+      // NeuroPatch activation - CFI 60 threshold  
+      else if (smoothedCfi >= 60 && sustainedCfiRef.current.high >= 2) {
+        console.log(`🩹 NeuroPatch ACTIVATING! CFI: ${smoothedCfi}, Sustained: ${sustainedCfiRef.current.high}`)
         setIsPatchActive(true)
         patchStartCfiRef.current = smoothedCfi
         lastInterventionTimeRef.current = now
         sustainedCfiRef.current.medium = 0
         sustainedCfiRef.current.high = 0
+        console.log('🩹 NeuroPatch activated - High stress detected at CFI 60+')
+      }
+      // Debug why activation didn't happen
+      else if (smoothedCfi >= 30) {
+        console.log(`🙅 No activation: CFI ${smoothedCfi} < 35 OR sustained medium ${sustainedCfiRef.current.medium} < 1`)
+      }
+    }
+    // Log why interventions are blocked
+    else if (smoothedCfi >= 35 && !isPatchActive && !isGardenActive) {
+      const remainingCooldown = Math.max(0, (minInterventionInterval - timeSinceLastIntervention) / 1000 / 60)
+      if (remainingCooldown > 0) {
+        console.log(`⏰ NeuroGarden blocked - ${Math.ceil(remainingCooldown)} minutes cooldown remaining`)
+      } else {
+        console.log(`🤔 NeuroGarden blocked for unknown reason - Debug needed`)
       }
     }
   }, [sentimentScore, isPatchActive, isGardenActive])
@@ -270,7 +389,7 @@ export function NeuroFogProvider({ children }: { children: ReactNode }) {
     document.addEventListener('wheel', handleScroll, { passive: true })
     document.addEventListener('visibilitychange', handleVisibilityChange)
 
-    intervalRef.current = setInterval(updateState, 2000)
+    intervalRef.current = setInterval(updateState, 1000)  // 1 second for demo responsiveness
 
     return () => {
       document.removeEventListener('keydown', handleKeydown)
@@ -322,27 +441,32 @@ export function NeuroFogProvider({ children }: { children: ReactNode }) {
       
       setGardenState(newGardenState)
       
-      // Provide gentle cognitive boost based on garden activity
-      const recoveryBoost = Math.min(20, effectiveness / 5)
+      // Provide calming effect based on garden activity effectiveness
+      const calmingEffect = Math.min(30, effectiveness / 3) // Max 30 point CFI reduction
       setRecoveryScore(effectiveness)
       
-      // Light boost to signals and CFI with garden-based recovery
+      // Apply calming effect - reduce CFI and improve cognitive state
       if (trackerRef.current) {
         trackerRef.current.reset()
       }
       
+      // Reduce CFI based on intervention effectiveness
+      const newCfi = Math.max(0, state.cfi - calmingEffect)
+      cfiHistoryRef.current.push(newCfi) // Add the reduced CFI to history
+      
       setState(prev => {
-        const boostedCfi = Math.min(100, prev.cfi + recoveryBoost)
         return {
           ...prev,
-          cfi: boostedCfi,
-          normalizedLoad: Math.max(0, prev.normalizedLoad - (recoveryBoost / 50)),
-          attentionStability: Math.min(1, prev.attentionStability + (recoveryBoost / 100)),
-          status: getStatusFromCFI(boostedCfi),
+          cfi: newCfi, // Reduced CFI indicates calming effect
+          normalizedLoad: Math.max(0, prev.normalizedLoad - (calmingEffect / 50)),
+          attentionStability: Math.min(1, prev.attentionStability + (calmingEffect / 100)),
+          status: getStatusFromCFI(newCfi),
           trend: 'improving',
           signals: DEFAULT_SIGNALS,
         }
       })
+      
+      console.log(`🌱 NeuroGarden completed - CFI reduced by ${Math.round(calmingEffect)} points (effectiveness: ${effectiveness}%)`)
     }
   }, [gardenState])
 
@@ -360,11 +484,13 @@ export function NeuroFogProvider({ children }: { children: ReactNode }) {
       patchStartCfiRef.current = null
     }
 
-    // Reset CFI to 0 after NeuroPatch intervention
+    // Reset CFI with calming effect after NeuroPatch intervention  
     if (trackerRef.current) {
       trackerRef.current.reset()
     }
-    cfiHistoryRef.current = []
+    cfiHistoryRef.current = [0] // Reset with calm baseline
+    sustainedCfiRef.current = { high: 0, medium: 0 } // Reset sustained counters
+    
     setState(prev => ({
       ...prev,
       cfi: 0, // Reset to baseline clear state
@@ -374,6 +500,8 @@ export function NeuroFogProvider({ children }: { children: ReactNode }) {
       trend: 'improving',
       signals: DEFAULT_SIGNALS,
     }))
+    
+    console.log(`🩹 NeuroPatch completed - CFI reset to 0, user now in calm state`)
   }, [state.cfi])
 
   const setSentiment = useCallback((score: number) => {

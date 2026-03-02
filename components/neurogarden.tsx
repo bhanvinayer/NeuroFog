@@ -313,6 +313,24 @@ const getWeatherEffect = (weather: WeatherType, plantType: PlantType): { healthM
 
 export function NeuroGarden({ isActive, userType, onComplete }: NeuroGardenProps) {
   const { state, gardenState, updateGarden } = useNeuroFog()
+  
+  // Debug logging for activation
+  useEffect(() => {
+    console.log('🌱 NeuroGarden render state:', { isActive, userType, cfi: state.cfi })
+    if (isActive) {
+      console.log('🌱 NeuroGarden should be visible - rendering garden modal')
+    }
+  }, [isActive, userType, state.cfi])
+
+  // Cleanup particle timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined' && (window as any).particleTimeouts) {
+        ;(window as any).particleTimeouts.forEach((timeoutId: NodeJS.Timeout) => clearTimeout(timeoutId))
+        ;(window as any).particleTimeouts = []
+      }
+    }
+  }, [])
   const [currentActivity, setCurrentActivity] = useState<GardenActivity | null>(null)
   const [activityProgress, setActivityProgress] = useState(0)
   const [selectedPlantPosition, setSelectedPlantPosition] = useState<{ x: number; y: number } | null>(null)
@@ -412,8 +430,9 @@ export function NeuroGarden({ isActive, userType, onComplete }: NeuroGardenProps
 
   // Particle system for visual effects
   const generateParticles = useCallback((type: string, count: number = 5) => {
+    const timestamp = performance.now() + Math.random() * 1000 // More unique timestamp
     const newParticles = Array.from({ length: count }, (_, i) => ({
-      id: `${type}-${Date.now()}-${i}`,
+      id: `${type}-${timestamp.toFixed(3)}-${i}-${Math.random().toString(36).substr(2, 9)}`, // Much more unique ID
       x: Math.random() * 100,
       y: Math.random() * 100,
       type
@@ -421,9 +440,15 @@ export function NeuroGarden({ isActive, userType, onComplete }: NeuroGardenProps
     setParticleSystem(prev => [...prev, ...newParticles])
     
     // Clean up particles after animation
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       setParticleSystem(prev => prev.filter(p => !newParticles.some(np => np.id === p.id)))
     }, 3000)
+    
+    // Store timeout IDs for cleanup
+    if (typeof window !== 'undefined') {
+      if (!(window as any).particleTimeouts) (window as any).particleTimeouts = []
+      ;(window as any).particleTimeouts.push(timeoutId)
+    }
   }, [])
 
   // Enhanced code snippets with more variety
@@ -668,7 +693,16 @@ export function NeuroGarden({ isActive, userType, onComplete }: NeuroGardenProps
     return Math.round((matches / target.length) * 100)
   }
 
-  if (!isActive || !currentActivity) return null
+  if (!isActive) {
+    console.log('🌱 NeuroGarden not active, not rendering')
+    return null
+  }
+  if (!currentActivity) {
+    console.log('🌱 NeuroGarden active but no current activity yet')
+    return null  
+  }
+
+  console.log('🌱 NeuroGarden rendering with activity:', currentActivity.name)
 
   const getActivityIcon = (type: ActivityType): string => {
     switch (type) {
@@ -699,7 +733,7 @@ export function NeuroGarden({ isActive, userType, onComplete }: NeuroGardenProps
         <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-3xl">
           {weather === 'rainy' && Array.from({ length: 30 }).map((_, i) => (
             <div
-              key={`rain-${i}`}
+              key={`rain-${weather}-${i}`}
               className="absolute w-0.5 h-6 bg-blue-400/30 animate-bounce"
               style={{
                 left: `${Math.random() * 100}%`,
@@ -711,7 +745,7 @@ export function NeuroGarden({ isActive, userType, onComplete }: NeuroGardenProps
           ))}
           {weather === 'storm' && Array.from({ length: 15 }).map((_, i) => (
             <div
-              key={`lightning-${i}`}
+              key={`lightning-${weather}-${i}`}
               className="absolute w-1 h-20 bg-yellow-300/50 animate-pulse"
               style={{
                 left: `${Math.random() * 100}%`,
@@ -723,7 +757,7 @@ export function NeuroGarden({ isActive, userType, onComplete }: NeuroGardenProps
           ))}
           {weather === 'aurora' && Array.from({ length: 8 }).map((_, i) => (
             <div
-              key={`aurora-${i}`}
+              key={`aurora-${weather}-${i}`}
               className="absolute h-full w-24 bg-gradient-to-b from-purple-300/20 to-green-300/20 animate-pulse"
               style={{
                 left: `${i * 12}%`,
@@ -978,7 +1012,7 @@ export function NeuroGarden({ isActive, userType, onComplete }: NeuroGardenProps
             <div className="grid grid-cols-3 gap-6 max-w-2xl mx-auto">
               {gardenState.plants.map((plant, index) => (
                 <div
-                  key={index}
+                  key={plant.id}
                   className="group relative bg-white/40 backdrop-blur-sm rounded-2xl p-6 border border-white/60 hover:bg-white/60 transition-all duration-300 hover:scale-105 cursor-pointer"
                   onClick={() => setSelectedPlantIndex(index)}
                 >

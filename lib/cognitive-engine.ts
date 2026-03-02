@@ -52,7 +52,7 @@ const INITIAL_BASELINE: Baseline = {
   typingSpeed: 4,    // chars/sec - slightly lower for easier triggering
   mouseSpeed: 250,   // px/sec - reduced for demo sensitivity  
   scrollSpeed: 150,  // px/sec - reduced for demo sensitivity
-  samples: 0,
+  samples: 10,       // Start with baseline samples for immediate demo responsiveness
 }
 
 export function getStatusFromCFI(cfi: number): CognitiveState['status'] {
