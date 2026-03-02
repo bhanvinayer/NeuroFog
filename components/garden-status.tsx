@@ -69,15 +69,15 @@ export function GardenStatus() {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-3 gap-3 mb-3 text-center">
-        <div className="bg-white/50 dark:bg-white/10 rounded-lg py-2 px-1">
+        <div className="bg-blue-900/30 dark:bg-blue-900/20 rounded-lg py-2 px-1">
           <div className="text-lg leading-none">{getGardenHealth()}%</div>
           <div className="text-xs text-green-600 dark:text-green-300">Health</div>
         </div>
-        <div className="bg-white/50 dark:bg-white/10 rounded-lg py-2 px-1">
+        <div className="bg-blue-900/30 dark:bg-blue-900/20 rounded-lg py-2 px-1">
           <div className="text-lg leading-none">{gardenState.streakDays}</div>
           <div className="text-xs text-green-600 dark:text-green-300">Streak</div>
         </div>
-        <div className="bg-white/50 dark:bg-white/10 rounded-lg py-2 px-1">
+        <div className="bg-blue-900/30 dark:bg-blue-900/20 rounded-lg py-2 px-1">
           <div className="text-lg leading-none">{getRecentEffectiveness()}%</div>
           <div className="text-xs text-green-600 dark:text-green-300">Effect</div>
         </div>
@@ -93,7 +93,7 @@ export function GardenStatus() {
                 {gardenState.plants.slice(0, 8).map((plant) => (
                   <div
                     key={plant.id}
-                    className="bg-white/60 dark:bg-white/20 rounded-lg p-2 text-center relative"
+                    className="bg-blue-900/40 dark:bg-blue-900/30 rounded-lg p-2 text-center relative"
                     title={`${plant.type.replaceAll('-', ' ')}\nHealth: ${plant.health}%`}
                   >
                     <div className="text-sm">
@@ -109,7 +109,7 @@ export function GardenStatus() {
                   </div>
                 ))}
                 {gardenState.plants.length > 8 && (
-                  <div className="bg-white/60 dark:bg-white/20 rounded-lg p-2 text-center flex items-center justify-center">
+                  <div className="bg-blue-900/40 dark:bg-blue-900/30 rounded-lg p-2 text-center flex items-center justify-center">
                     <span className="text-xs text-green-600 dark:text-green-300">+{gardenState.plants.length - 8}</span>
                   </div>
                 )}

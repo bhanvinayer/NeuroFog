@@ -75,7 +75,7 @@ export function TrackingControls() {
       </Link>
 
       {/* Privacy indicator */}
-      <span className="ml-auto flex items-center gap-1.5 text-[10px] text-muted-foreground/40">
+      <span className="ml-auto flex items-center gap-1.5 text-[10px] text-white bg-blue-900 border border-blue-800 px-3 py-2 rounded-lg">
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
           <rect x="2" y="4.5" width="6" height="4.5" rx="1" stroke="currentColor" strokeWidth="0.8" />
           <path d="M3 4.5V3a2 2 0 014 0v1.5" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round" />

@@ -41,7 +41,7 @@ const TUTORIAL_SLIDES = [
           CFI starts at 0 (clear baseline) and increases as behavioral patterns indicate growing cognitive fog and mental fatigue.
         </p>
         
-        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+        <div className="bg-blue-900/50 border border-blue-800 rounded-xl p-4">
           <h4 className="font-semibold text-gray-800 mb-3">How CFI Increases with Cognitive Stress:</h4>
           <div className="grid grid-cols-1 gap-3 text-sm">
             <div className="flex items-start gap-2">
@@ -406,9 +406,9 @@ export function NeuroFogTutorial({ isOpen, onClose }: NeuroFogTutorialProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-card border border-border rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+      <div className="bg-blue-900 border border-blue-800 rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="relative bg-gradient-to-r from-primary/10 to-secondary/10 border-b border-border p-4 md:p-6 flex-shrink-0">
+        <div className="relative bg-blue-800/50 border-b border-blue-700 p-4 md:p-6 flex-shrink-0">
           <button
             onClick={onClose}
             className="absolute top-3 right-3 md:top-4 md:right-4 w-8 h-8 md:w-10 md:h-10 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full flex items-center justify-center text-foreground/70 hover:text-foreground transition-all duration-300 hover:scale-110"
@@ -448,7 +448,7 @@ export function NeuroFogTutorial({ isOpen, onClose }: NeuroFogTutorialProps) {
         </div>
 
         {/* Footer - fixed at bottom */}
-        <div className="flex items-center justify-between p-4 md:p-6 border-t border-border bg-secondary/20 flex-shrink-0">
+        <div className="flex items-center justify-between p-4 md:p-6 border-t border-blue-700 bg-blue-800/30 flex-shrink-0">
           <button
             onClick={handleSkip}
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"

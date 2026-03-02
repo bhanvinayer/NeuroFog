@@ -10,8 +10,16 @@ import {
   type CognitiveState,
   type TimelineEntry,
 } from '@/lib/cognitive-engine'
+import { VoiceAnalyzer, type VoiceMetrics, type VoiceAnalysisResult } from '@/lib/voice-analysis'
+import { 
+  getPersonalizationProfile, 
+  calculatePersonalizedCFI,
+  getPersonalizedRecommendations,
+  getTrackingFocus,
+  type UserType 
+} from '@/lib/personalization'
 
-type UserType = 'developer' | 'student' | 'creator'
+// UserType now imported from personalization
 type PlantType = 'focus-flower' | 'energy-tree' | 'calm-succulent' | 'creativity-vine' | 'productivity-herb' | 'wisdom-moss' |
   'zen-bamboo' | 'courage-oak' | 'peace-lily' | 'inspiration-orchid'
 
@@ -54,6 +62,14 @@ interface NeuroFogContextType {
   gardenState: GardenState
   sentimentScore: number
   recoveryScore: number | null
+  // Voice analysis
+  isVoiceEnabled: boolean
+  voiceMetrics: VoiceMetrics | null
+  voiceAnalysisResult: VoiceAnalysisResult | null
+  personalizedCfi: number
+  personalizedRecommendations: string[]
+  trackingFocus: string[]
+  // Methods
   startTracking: () => void
   stopTracking: () => void
   activatePatch: () => void
@@ -64,6 +80,9 @@ interface NeuroFogContextType {
   updateGarden: (newState: GardenState) => void
   setSentiment: (score: number) => void
   resetSession: () => void
+  // Voice methods
+  toggleVoiceAnalysis: () => void
+  calibrateVoice: () => void
 }
 
 const NeuroFogContext = createContext<NeuroFogContextType | null>(null)
@@ -76,6 +95,7 @@ export function useNeuroFog() {
 
 export function NeuroFogProvider({ children }: { children: ReactNode }) {
   const trackerRef = useRef<CognitiveTracker | null>(null)
+  const voiceAnalyzerRef = useRef<VoiceAnalyzer | null>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const cfiHistoryRef = useRef<number[]>([])
   const patchStartCfiRef = useRef<number | null>(null)
@@ -88,6 +108,14 @@ export function NeuroFogProvider({ children }: { children: ReactNode }) {
   const [userType, setUserType] = useState<UserType>('developer')
   const [sentimentScore, setSentimentScore] = useState(0.8)
   const [recoveryScore, setRecoveryScore] = useState<number | null>(null)
+  
+  // Voice analysis state
+  const [isVoiceEnabled, setIsVoiceEnabled] = useState(false)
+  const [voiceMetrics, setVoiceMetrics] = useState<VoiceMetrics | null>(null)
+  const [voiceAnalysisResult, setVoiceAnalysisResult] = useState<VoiceAnalysisResult | null>(null)
+  const [personalizedCfi, setPersonalizedCfi] = useState(0)
+  const [personalizedRecommendations, setPersonalizedRecommendations] = useState<string[]>([])
+  const [trackingFocus, setTrackingFocus] = useState<string[]>(['typing', 'mouse', 'focus'])
   
   // Initialize garden state
   const [gardenState, setGardenState] = useState<GardenState>({
@@ -113,9 +141,10 @@ export function NeuroFogProvider({ children }: { children: ReactNode }) {
   })
   const [timeline, setTimeline] = useState<TimelineEntry[]>([])
 
-  // Initialize tracker and auto-start tracking for demo
+  // Initialize tracker and voice analyzer
   useEffect(() => {
     trackerRef.current = new CognitiveTracker()
+    voiceAnalyzerRef.current = new VoiceAnalyzer()
     
     // Auto-start tracking for demo purposes after 1 second
     const autoStartTimer = setTimeout(() => {
@@ -126,8 +155,18 @@ export function NeuroFogProvider({ children }: { children: ReactNode }) {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
       clearTimeout(autoStartTimer)
+      if (voiceAnalyzerRef.current) {
+        voiceAnalyzerRef.current.stopAnalysis()
+      }
     }
   }, [])
+
+  // Update personalization when user type changes
+  useEffect(() => {
+    const focus = getTrackingFocus(userType)
+    setTrackingFocus(focus)
+    console.log(`👤 User type: ${userType}, Focus: ${focus.join(', ')}`)
+  }, [userType])
 
   // Intelligent intervention system with garden integration
   const shouldActivateGarden = useCallback((): boolean => {
@@ -162,13 +201,31 @@ export function NeuroFogProvider({ children }: { children: ReactNode }) {
     const baseline = trackerRef.current.getBaseline()
     const { cfi: rawCfi, normalizedLoad, attentionStability, isExcessiveAgitation } = computeCFI(signals, baseline, sentimentScore)
 
-    // Demo-optimized smoothing - allow faster changes for demo visibility
-    let smoothedCfi = rawCfi
+    // Get voice analysis if enabled
+    let voiceStress = 0
+    let currentVoiceMetrics: VoiceMetrics | null = null
+    let currentVoiceResult: VoiceAnalysisResult | null = null
+    
+    if (isVoiceEnabled && voiceAnalyzerRef.current) {
+      currentVoiceMetrics = voiceAnalyzerRef.current.getCurrentMetrics()
+      currentVoiceResult = voiceAnalyzerRef.current.getAnalysisResult()
+      voiceStress = voiceAnalyzerRef.current.analyzeForCognitiveLoad()
+      
+      setVoiceMetrics(currentVoiceMetrics)
+      setVoiceAnalysisResult(currentVoiceResult)
+    }
+
+    // Calculate personalized CFI based on user type
+    const personalizedCfiValue = calculatePersonalizedCFI(rawCfi, voiceStress, signals, userType)
+    setPersonalizedCfi(personalizedCfiValue)
+
+    // Use personalized CFI for main calculations
+    let smoothedCfi = personalizedCfiValue
     if (cfiHistoryRef.current.length > 0) {
       const lastCfi = cfiHistoryRef.current[cfiHistoryRef.current.length - 1]
       // Allow faster changes for demo - max 15 points per update (or immediate for agitation)
       const maxChange = isExcessiveAgitation ? 50 : 15  // Increased for demo visibility
-      const cfiDelta = rawCfi - lastCfi
+      const cfiDelta = personalizedCfiValue - lastCfi
       if (Math.abs(cfiDelta) > maxChange) {
         smoothedCfi = lastCfi + Math.sign(cfiDelta) * maxChange
       }
@@ -180,14 +237,20 @@ export function NeuroFogProvider({ children }: { children: ReactNode }) {
       console.log(`🚀 Demo boost applied! CFI boosted to ${smoothedCfi}`)
     }
 
+    // Voice stress boost for demo visibility
+    if (voiceStress > 0.5 && currentVoiceMetrics?.volume && currentVoiceMetrics.volume > 0.1) {
+      smoothedCfi = Math.min(100, smoothedCfi + (voiceStress * 20))
+      console.log(`🎤 Voice stress detected! CFI boosted by ${voiceStress * 20}`)
+    }
+
     // Track sustained CFI levels - aligned with intervention thresholds
-    if (smoothedCfi >= 60) {  // High threshold for NeuroPatch
+    if (smoothedCfi >= 60) {  // High threshold for NeuroPatch - requires 35 seconds
       sustainedCfiRef.current.high++
     } else {
       sustainedCfiRef.current.high = 0
     }
     
-    if (smoothedCfi >= 35) {  // Medium threshold for NeuroGarden - reduced to 35
+    if (smoothedCfi >= 75) {  // Medium-high threshold for NeuroGarden - increased to 75
       sustainedCfiRef.current.medium++
     } else {
       sustainedCfiRef.current.medium = 0
@@ -211,9 +274,14 @@ export function NeuroFogProvider({ children }: { children: ReactNode }) {
 
     setState(newState)
 
+    // Generate personalized recommendations
+    const recommendations = getPersonalizedRecommendations(smoothedCfi, voiceStress, userType)
+    setPersonalizedRecommendations(recommendations)
+
     // Debug logging for demo with calm state detection
-    if (smoothedCfi > 10 || isExcessiveAgitation) {
-      console.log(`CFI: ${smoothedCfi}, Mouse: ${Math.round(signals.mouseSpeed)}px/s, Scroll: ${Math.round(signals.scrollSpeed)}px/s, Agitation: ${isExcessiveAgitation}, Sustained Medium: ${sustainedCfiRef.current.medium}, Sustained High: ${sustainedCfiRef.current.high}`)
+    const voiceInfo = currentVoiceMetrics ? `, Voice: ${currentVoiceMetrics.emotionalTone}(${(voiceStress * 100).toFixed(0)}%)` : ''
+    if (smoothedCfi > 10 || isExcessiveAgitation || voiceStress > 0.3) {
+      console.log(`${userType.toUpperCase()} CFI: ${smoothedCfi}${voiceInfo}, Mouse: ${Math.round(signals.mouseSpeed)}px/s, Scroll: ${Math.round(signals.scrollSpeed)}px/s, Sustained Medium: ${sustainedCfiRef.current.medium}, Sustained High: ${sustainedCfiRef.current.high}`)
     } else if (smoothedCfi < 10 && cfiHistoryRef.current.length > 5) {
       console.log(`😌 User in calm state - CFI: ${smoothedCfi} (interventions on cooldown)`)
     }
@@ -317,49 +385,39 @@ export function NeuroFogProvider({ children }: { children: ReactNode }) {
       })
     }
     
-    // IMMEDIATE NeuroPatch activation for excessive agitation (mouse + scroll)
-    if (isExcessiveAgitation && !isPatchActive && !isGardenActive) {
-      setIsGardenActive(false) // Ensure garden is off
-      setIsPatchActive(true)
-      patchStartCfiRef.current = smoothedCfi
-      lastInterventionTimeRef.current = now
-      sustainedCfiRef.current.medium = 0
-      sustainedCfiRef.current.high = 0
-      console.log('🚨 Emergency NeuroPatch activated - Excessive agitation detected!')
-    }
-    // Normal intervention logic - demo optimized for FASTER activation
-    else if (!isPatchActive && !isGardenActive && timeSinceLastIntervention >= minInterventionInterval) {
-      // NeuroGarden activation - CFI 35 threshold (REDUCED requirements for demo)
-      if (smoothedCfi >= 35 && sustainedCfiRef.current.medium >= 1) { // REDUCED to just 1 sustained reading!
-        console.log(`🌱 NeuroGarden ACTIVATING! CFI: ${smoothedCfi}, Sustained: ${sustainedCfiRef.current.medium}`)
-        setIsGardenActive(true)
-        lastInterventionTimeRef.current = now
-        sustainedCfiRef.current.medium = 0
-        sustainedCfiRef.current.high = 0
-        console.log('🌱 NeuroGarden activated - Stress detected at CFI 35+')
-      }
-      // NeuroPatch activation - CFI 60 threshold  
-      else if (smoothedCfi >= 60 && sustainedCfiRef.current.high >= 2) {
-        console.log(`🩹 NeuroPatch ACTIVATING! CFI: ${smoothedCfi}, Sustained: ${sustainedCfiRef.current.high}`)
+    // Improved intervention logic - prevents premature activation
+    if (!isPatchActive && !isGardenActive && timeSinceLastIntervention >= minInterventionInterval) {
+      // NeuroPatch activation - requires 35 seconds of sustained high stress (CFI 60+) 
+      if (smoothedCfi >= 60 && sustainedCfiRef.current.high >= 35) { // 35 seconds of sustained stress
+        console.log(`🩹 NeuroPatch ACTIVATING! CFI: ${smoothedCfi}, Sustained: ${sustainedCfiRef.current.high} seconds`)
         setIsPatchActive(true)
         patchStartCfiRef.current = smoothedCfi
         lastInterventionTimeRef.current = now
         sustainedCfiRef.current.medium = 0
         sustainedCfiRef.current.high = 0
-        console.log('🩹 NeuroPatch activated - High stress detected at CFI 60+')
+        console.log('🩹 NeuroPatch activated - 35 seconds of sustained high stress')
+      }
+      // NeuroGarden activation - CFI 75 threshold (increased from 35)
+      else if (smoothedCfi >= 75 && sustainedCfiRef.current.medium >= 3) { // 3 seconds at CFI 75+
+        console.log(`🌱 NeuroGarden ACTIVATING! CFI: ${smoothedCfi}, Sustained: ${sustainedCfiRef.current.medium}`)
+        setIsGardenActive(true)
+        lastInterventionTimeRef.current = now
+        sustainedCfiRef.current.medium = 0
+        sustainedCfiRef.current.high = 0
+        console.log('🌱 NeuroGarden activated - Stress detected at CFI 75+')
       }
       // Debug why activation didn't happen
-      else if (smoothedCfi >= 30) {
-        console.log(`🙅 No activation: CFI ${smoothedCfi} < 35 OR sustained medium ${sustainedCfiRef.current.medium} < 1`)
+      else if (smoothedCfi >= 50) {
+        console.log(`🙅 No activation: CFI ${smoothedCfi} (need 75+ for Garden, 60+ for Patch) | Garden sustained: ${sustainedCfiRef.current.medium}/3 | Patch sustained: ${sustainedCfiRef.current.high}/35`)
       }
     }
     // Log why interventions are blocked
-    else if (smoothedCfi >= 35 && !isPatchActive && !isGardenActive) {
+    else if (smoothedCfi >= 60 && !isPatchActive && !isGardenActive) {
       const remainingCooldown = Math.max(0, (minInterventionInterval - timeSinceLastIntervention) / 1000 / 60)
       if (remainingCooldown > 0) {
-        console.log(`⏰ NeuroGarden blocked - ${Math.ceil(remainingCooldown)} minutes cooldown remaining`)
+        console.log(`⏰ Interventions blocked - ${Math.ceil(remainingCooldown)} seconds cooldown remaining`)
       } else {
-        console.log(`🤔 NeuroGarden blocked for unknown reason - Debug needed`)
+        console.log(`🤔 Interventions blocked for unknown reason - Debug needed`)
       }
     }
   }, [sentimentScore, isPatchActive, isGardenActive])
@@ -508,13 +566,49 @@ export function NeuroFogProvider({ children }: { children: ReactNode }) {
     setSentimentScore(Math.max(0, Math.min(1, score)))
   }, [])
 
+  // Voice analysis methods
+  const toggleVoiceAnalysis = useCallback(async () => {
+    if (!voiceAnalyzerRef.current) return
+    
+    if (isVoiceEnabled) {
+      voiceAnalyzerRef.current.stopAnalysis()
+      setIsVoiceEnabled(false)
+      setVoiceMetrics(null)
+      setVoiceAnalysisResult(null)
+      console.log('🎤 Voice analysis disabled')
+    } else {
+      const success = await voiceAnalyzerRef.current.startAnalysis()
+      if (success) {
+        setIsVoiceEnabled(true)
+        console.log('🎤 Voice analysis enabled')
+      } else {
+        console.error('Failed to start voice analysis')
+      }
+    }
+  }, [isVoiceEnabled])
+
+  const calibrateVoice = useCallback(() => {
+    if (voiceAnalyzerRef.current && isVoiceEnabled) {
+      voiceAnalyzerRef.current.updateBaseline()
+      console.log('🎤 Voice baseline calibrated')
+    }
+  }, [isVoiceEnabled])
+
   const resetSession = useCallback(() => {
     trackerRef.current?.reset()
+    if (voiceAnalyzerRef.current) {
+      voiceAnalyzerRef.current.stopAnalysis()
+    }
     cfiHistoryRef.current = []
     setTimeline([])
     setRecoveryScore(null)
     setIsPatchActive(false)
     setIsGardenActive(false)
+    setIsVoiceEnabled(false)
+    setVoiceMetrics(null)
+    setVoiceAnalysisResult(null)
+    setPersonalizedCfi(0)
+    setPersonalizedRecommendations([])
     setState({
       cfi: 0, // Start at baseline clear state
       normalizedLoad: 0.1,
@@ -537,6 +631,14 @@ export function NeuroFogProvider({ children }: { children: ReactNode }) {
       gardenState,
       sentimentScore,
       recoveryScore,
+      // Voice analysis
+      isVoiceEnabled,
+      voiceMetrics,
+      voiceAnalysisResult,
+      personalizedCfi,
+      personalizedRecommendations,
+      trackingFocus,
+      // Methods
       startTracking,
       stopTracking,
       activatePatch,
@@ -547,6 +649,9 @@ export function NeuroFogProvider({ children }: { children: ReactNode }) {
       updateGarden,
       setSentiment,
       resetSession,
+      // Voice methods
+      toggleVoiceAnalysis,
+      calibrateVoice,
     }}>
       {children}
     </NeuroFogContext.Provider>
