@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNeuroFog } from '@/components/neurofog-provider'
 
 const SAMPLE_TEXTS = [
@@ -13,8 +13,13 @@ const SAMPLE_TEXTS = [
 export function TypingArea() {
   const { isTracking } = useNeuroFog()
   const [text, setText] = useState('')
-  const [sampleIndex] = useState(() => Math.floor(Math.random() * SAMPLE_TEXTS.length))
+  const [sampleIndex, setSampleIndex] = useState(0) // Start with first sample to prevent hydration mismatch
   const sample = SAMPLE_TEXTS[sampleIndex]
+
+  // Set random sample after component mounts to prevent hydration mismatch
+  useEffect(() => {
+    setSampleIndex(Math.floor(Math.random() * SAMPLE_TEXTS.length))
+  }, [])
 
   const wordCount = text.trim().split(/\s+/).filter(Boolean).length
   const charCount = text.length

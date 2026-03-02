@@ -1,7 +1,7 @@
 'use client'
 
 import { useNeuroFog } from '@/components/neurofog-provider'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 const REFLECTION_PROMPTS = [
   "How focused do you feel right now?",
@@ -19,14 +19,16 @@ const WORD_PROMPTS = [
 
 export function ReflectionPrompt() {
   const { setSentiment, sentimentScore } = useNeuroFog()
-  const [currentPrompt] = useState(() =>
-    REFLECTION_PROMPTS[Math.floor(Math.random() * REFLECTION_PROMPTS.length)]
-  )
-  const [wordPrompt] = useState(() =>
-    WORD_PROMPTS[Math.floor(Math.random() * WORD_PROMPTS.length)]
-  )
+  const [currentPrompt, setCurrentPrompt] = useState(REFLECTION_PROMPTS[0])
+  const [wordPrompt, setWordPrompt] = useState(WORD_PROMPTS[0])
   const [words, setWords] = useState('')
   const [submitted, setSubmitted] = useState(false)
+
+  // Set random prompts after hydration to avoid SSR mismatch
+  useEffect(() => {
+    setCurrentPrompt(REFLECTION_PROMPTS[Math.floor(Math.random() * REFLECTION_PROMPTS.length)])
+    setWordPrompt(WORD_PROMPTS[Math.floor(Math.random() * WORD_PROMPTS.length)])
+  }, [])
 
   // Simple sentiment analysis from words
   const analyzeWords = (text: string): number => {

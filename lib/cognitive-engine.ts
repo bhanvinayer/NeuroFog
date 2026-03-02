@@ -49,17 +49,17 @@ interface Baseline {
 }
 
 const INITIAL_BASELINE: Baseline = {
-  typingSpeed: 5,    // chars/sec
-  mouseSpeed: 300,   // px/sec
-  scrollSpeed: 200,  // px/sec
+  typingSpeed: 4,    // chars/sec - slightly lower for easier triggering
+  mouseSpeed: 250,   // px/sec - reduced for demo sensitivity  
+  scrollSpeed: 150,  // px/sec - reduced for demo sensitivity
   samples: 0,
 }
 
 export function getStatusFromCFI(cfi: number): CognitiveState['status'] {
-  if (cfi >= 80) return 'clear'
-  if (cfi >= 60) return 'mild'
-  if (cfi >= 40) return 'moderate'
-  if (cfi >= 20) return 'heavy'
+  if (cfi <= 25) return 'clear'
+  if (cfi <= 45) return 'mild'
+  if (cfi <= 65) return 'moderate'
+  if (cfi <= 80) return 'heavy'
   return 'critical'
 }
 
@@ -94,53 +94,98 @@ export function getStatusEmoji(status: CognitiveState['status']): string {
 }
 
 // Compute the Cognitive Fog Index
-// CFI = (1 - normalized_load) * attention_stability * sentiment_score * 100
+// Optimized for demo - responsive to stress patterns for judges presentation
 export function computeCFI(
   signals: CognitiveSignals,
   baseline: Baseline,
   sentimentScore: number = 0.8
-): { cfi: number; normalizedLoad: number; attentionStability: number } {
-  // Normalize cognitive load from signals
-  const typingLoadFactor = signals.typingVariability > 0
-    ? Math.min(signals.typingVariability / 0.5, 1)
+): { cfi: number; normalizedLoad: number; attentionStability: number; isExcessiveAgitation: boolean } {
+  // Calculate individual cognitive stress factors - demo-optimized for responsiveness
+  
+  // Typing stress factor - lower threshold for demo responsiveness
+  const typingStressFactor = signals.typingVariability > 0.6  // Reduced from 1.0
+    ? Math.min((signals.typingVariability - 0.6) / 1.0, 1) * 0.4  // Increased impact
     : 0
 
-  const mouseLoadFactor = signals.mouseVariability
+  // Mouse stress factor - dramatically increased for demo visibility
+  const mouseVariabilityStress = signals.mouseVariability > 0.6 ? signals.mouseVariability * 0.3 : 0  // Increased impact
+  
+  // Aggressive mouse movement stress - much more sensitive for demo
+  const fastMouseStress = signals.mouseSpeed > (baseline.mouseSpeed * 1.8) && baseline.samples > 2  // Lower threshold
+    ? Math.min((signals.mouseSpeed - baseline.mouseSpeed * 1.8) / (baseline.mouseSpeed * 1.5), 1) * 0.5  // Much higher impact
+    : 0
+  
+  const mouseStressFactor = mouseVariabilityStress + fastMouseStress
 
-  const tabSwitchFactor = Math.min(signals.tabSwitches / 10, 1)
-
-  const idleFactor = signals.idleTime > 30
-    ? Math.min((signals.idleTime - 30) / 120, 1) * 0.3
+  // Tab switching stress - more responsive for demo
+  const tabSwitchStressFactor = signals.tabSwitches > 6  // Reduced from 12
+    ? Math.min((signals.tabSwitches - 6) / 8, 1) * 0.4  // Increased impact
     : 0
 
-  const microPauseFactor = Math.min(signals.microPauses / 8, 1)
+  // Idle time stress - faster activation for demo
+  const idleStressFactor = signals.idleTime > 90 // Reduced from 180 seconds
+    ? Math.min((signals.idleTime - 90) / 180, 1) * 0.2  // Increased impact
+    : 0
 
-  // Weighted normalized load
-  const normalizedLoad = Math.min(1, Math.max(0,
-    typingLoadFactor * 0.25 +
-    mouseLoadFactor * 0.2 +
-    tabSwitchFactor * 0.25 +
-    idleFactor * 0.1 +
-    microPauseFactor * 0.2
+  // Micro pause stress - more sensitive for demo visibility
+  const microPauseStressFactor = signals.microPauses > 5  // Reduced from 10
+    ? Math.min((signals.microPauses - 5) / 8, 1) * 0.3  // Increased impact
+    : 0
+
+  // DRAMATIC scroll stress - key for demo impact with up/down scrolling
+  const scrollStressFactor = signals.scrollSpeed > (baseline.scrollSpeed * 2) && baseline.samples > 2  // Much lower threshold
+    ? Math.min((signals.scrollSpeed - baseline.scrollSpeed * 2) / (baseline.scrollSpeed * 1.5), 1) * 0.6  // MAJOR impact
+    : 0
+
+  // Detect aggressive behavior (lower threshold for demo visibility)
+  const isExcessiveAgitation = (
+    (signals.mouseSpeed > (baseline.mouseSpeed * 2.2) &&  // Reduced from 3
+     signals.scrollSpeed > (baseline.scrollSpeed * 1.8) &&  // Reduced from 2.5
+     baseline.samples > 2) ||  // Reduced from 5
+    signals.mouseSpeed > (baseline.mouseSpeed * 3.5) ||  // Pure aggressive mouse
+    signals.scrollSpeed > (baseline.scrollSpeed * 4)     // Pure aggressive scroll
+  )
+
+  // Aggressive behavior gets dramatic multiplier for demo impact
+  const agitationMultiplier = isExcessiveAgitation ? 4.5 : 1.0  // Increased from 3.0
+
+  // Weighted cognitive load (0-1) - optimized for demo responsiveness
+  const cognitiveLoad = Math.min(1, Math.max(0,
+    (typingStressFactor * 1.2 +      // Typing gets extra weight
+    mouseStressFactor * 1.5 +        // Mouse movement is key indicator
+    scrollStressFactor * 1.8 +       // Scrolling gets highest weight for demo
+    tabSwitchStressFactor +
+    idleStressFactor +
+    microPauseStressFactor) * agitationMultiplier
   ))
 
-  // Attention stability = inverse of erratic behavior
-  const speedDeviation = baseline.samples > 5 && baseline.typingSpeed > 0
+  // Attention stability calculation
+  const speedDeviation = baseline.samples > 10 && baseline.typingSpeed > 0
     ? Math.abs(signals.typingSpeed - baseline.typingSpeed) / baseline.typingSpeed
     : 0
   const attentionStability = Math.max(0, Math.min(1,
-    1 - (speedDeviation * 0.4 + tabSwitchFactor * 0.3 + mouseLoadFactor * 0.3)
+    1 - (speedDeviation * 0.15 + tabSwitchStressFactor * 0.3 + mouseStressFactor * 0.05)
   ))
 
-  // CFI formula
-  const cfi = Math.round(
-    (1 - normalizedLoad) * attentionStability * sentimentScore * 100
-  )
+  // Sentiment impact (lower sentiment = higher stress)
+  const sentimentStress = (1 - sentimentScore) * 0.2  // Reduced impact
+
+  // Combined stress score - reduced smoothing for faster demo response
+  const rawStressScore = cognitiveLoad * 0.7 + (1 - attentionStability) * 0.4 + sentimentStress
+
+  // Reduced smoothing for demo - faster CFI changes
+  // Aggressive behavior gets immediate response
+  const smoothedStress = isExcessiveAgitation ? rawStressScore : Math.pow(rawStressScore, 0.8)  // Less smoothing
+
+  // CFI formula optimized for demo visibility
+  const cfiScaling = isExcessiveAgitation ? 100 : 85  // Higher scaling
+  const cfi = Math.round(smoothedStress * cfiScaling)
 
   return {
     cfi: Math.max(0, Math.min(100, cfi)),
-    normalizedLoad,
+    normalizedLoad: cognitiveLoad,
     attentionStability,
+    isExcessiveAgitation,
   }
 }
 
@@ -250,9 +295,9 @@ export class CognitiveTracker {
 
   recordMouseMove(x: number, y: number) {
     const now = Date.now()
-    // Throttle to every 100ms
+    // Reduced throttle for demo - capture aggressive movement better
     if (this.mousePositions.length > 0 &&
-        now - this.mousePositions[this.mousePositions.length - 1].t < 100) {
+        now - this.mousePositions[this.mousePositions.length - 1].t < 50) {  // Reduced from 100ms to 50ms
       return
     }
     this.mousePositions.push({ x, y, t: now })

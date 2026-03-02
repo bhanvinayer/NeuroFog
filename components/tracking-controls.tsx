@@ -34,8 +34,8 @@ export function TrackingControls() {
         {isTracking ? 'Tracking Active' : 'Start Tracking'}
       </button>
 
-      {/* Manual NeuroPatch trigger */}
-      {isTracking && !isPatchActive && (
+      {/* Manual NeuroPatch trigger - only available when CFI is high enough */}
+      {isTracking && !isPatchActive && state.cfi >= 50 && (
         <button
           onClick={activatePatch}
           className="flex items-center gap-2 rounded-lg border border-border/50 bg-secondary/50 px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
@@ -44,7 +44,7 @@ export function TrackingControls() {
             <rect x="1" y="4" width="12" height="6" rx="2" stroke="currentColor" strokeWidth="1.2" />
             <path d="M5 6v2M7 5v4M9 6v2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
           </svg>
-          Activate NeuroPatch
+          Activate NeuroPatch (CFI: {Math.round(state.cfi)})
         </button>
       )}
 
